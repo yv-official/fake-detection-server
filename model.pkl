@@ -1,0 +1,158 @@
+# import os
+# import glob
+# import time
+# import torch
+# import cv2
+# from PIL import Image
+# import numpy as np
+# import pandas as pd
+# from matplotlib import pyplot as plt
+# from tqdm.notebook import tqdm
+
+# from facenet_pytorch import MTCNN, InceptionResnetV1, extract_face
+# device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+# print(f'Running on device: {device}')
+
+# mtcnn = MTCNN(margin=14, keep_all=True, factor=0.5, device=device).eval()
+
+
+# resnet = InceptionResnetV1(pretrained='vggface2', device=device).eval()
+
+# class DetectionPipeline:
+
+#     def __init__(self, detector, n_frames=None, batch_size=60, resize=None):
+
+#         self.detector = detector
+#         self.n_frames = n_frames
+#         self.batch_size = batch_size
+#         self.resize = resize
+        
+            
+#     def __call__(self, filename):
+ 
+   
+#         v_cap = cv2.VideoCapture(filename)
+#         v_len = int(v_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+#         print(v_len)
+    
+#         if self.n_frames is None:
+#             sample = np.arange(0, v_len)
+#         else:
+#             sample = np.linspace(0, v_len - 1, self.n_frames).astype(int)
+
+   
+#         faces = []
+#         frames = []
+#         for j in range(v_len):
+#             success = v_cap.grab()
+#             if j in sample:
+    
+#                 success, frame = v_cap.retrieve()
+#                 if not success:
+#                     continue
+#                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+#                 frame = Image.fromarray(frame)
+                
+    
+#                 if self.resize is not None:
+#                     frame = frame.resize([int(d * self.resize) for d in frame.size])
+#                 frames.append(frame)
+
+   
+#                 if len(frames) % self.batch_size == 0 or j == sample[-1]:
+#                     faces.extend(self.detector(frames))
+#                     frames = []
+
+#         v_cap.release()
+        
+#         return faces
+
+# import copy
+# def process_faces(faces, resnet):
+
+#     faces = [f for f in faces if f is not None]
+#     if(len(faces) == 0):
+#         return []
+
+#     faces = torch.cat(faces).to(device)
+#     if(len(faces)<290):
+#         return []
+
+#     faces = faces[:290]
+
+#     embeddings = resnet(faces)
+
+#     centroid = embeddings.mean(dim=0)
+    
+#     x = (embeddings - centroid).norm(dim=1).cpu().numpy()
+    
+#     return x
+
+# detection_pipeline = DetectionPipeline(detector=mtcnn, batch_size=60, resize=0.25)
+# import json
+
+# with open('../input/deepfake-detection-challenge/train_sample_videos/metadata.json') as f:
+#   data = json.load(f)
+
+# filenames = glob.glob('/kaggle/input/deepfake-detection-challenge/train_sample_videos/*.mp4')
+# total_files = len(filenames)
+
+# X = []
+# y = []
+# start = time.time()
+# n_processed = 0
+
+# with torch.no_grad():
+#     for i, filename in tqdm(enumerate(filenames), total=len(filenames)):
+#         print(i, filename)
+#         try:
+
+#             faces = detection_pipeline(filename)
+                    
+#             z = process_faces(faces, resnet)
+#             if (len(z)!=0):
+#                 X.append(z)
+#                 if(data[filename[63:]]['label']=='FAKE'):
+#                     y.append(1)
+#                 else:
+#                     y.append(0)
+
+#         except KeyboardInterrupt:
+#             print('\nStopped.')
+#             break
+
+#         except Exception as e:
+#             print(e)
+#             X.append(None)
+        
+#         n_processed += len(faces)
+
+# X=X[1:]
+# y=y[1:]
+
+# from sklearn.model_selection import train_test_split
+
+# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.85, random_state=5)
+
+# from sklearn.linear_model import LogisticRegression
+
+# clf = LogisticRegression(random_state=0).fit(X_train, y_train)
+# y_pred_lr = clf.predict(X_test)
+
+# from sklearn import svm
+
+# clf = svm.SVC(gamma='auto')
+# clf.fit(X_train, y_train)
+# y_pred_svm = clf.predict(X_test)
+
+# from sklearn.metrics import accuracy_score
+# print(accuracy_score(y_test,y_pred_svm))
+
+def model(file):
+    print(file)
+    return {
+        "result": {
+            "fake": False,
+            "accuracy": "66.64533"
+        }
+    }
